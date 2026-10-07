@@ -56,9 +56,9 @@
     { id: "docs", block: "C", type: "multi", label: "С какими документами и текстами работаете каждую неделю", column: "Документы",
       options: ["Переписка с клиентами и гостями", "Отзывы", "Договоры и юридические документы", "Коммерческие предложения и прайсы", "Таблицы с выручкой и расходами", "Отчёты руководству", "Объявления и описания объектов", "Меню и описания блюд", "Презентации", "Регламенты и инструкции"],
       other: "Что ещё" },
-    { id: "tasks", block: "C", type: "textarea", label: "Три рабочие задачи, которые хотели бы отдать ИИ", required: true, column: "Три задачи",
-      hint: "По одной на строку. Чем конкретнее, тем лучше: не «письма», а «ответы на отзывы гостей на Яндекс Картах».",
-      placeholder: "1. \n2. \n3. " },
+    { id: "tasks", block: "C", type: "list", count: 3, label: "Три рабочие задачи, которые хотели бы отдать ИИ", required: true, column: "Три задачи",
+      hint: "Чем конкретнее, тем лучше: не «письма», а «ответы на отзывы гостей на Яндекс Картах».",
+      placeholders: ["Например: ответы на отзывы гостей", "Например: сводка выручки за неделю", "Например: письма поставщикам"] },
     { id: "agentDef", block: "C", type: "textarea", short: true, label: "Что для вас «ИИ-агент», одним предложением", column: "Что такое агент",
       hint: "Любой ответ подходит, в том числе «не знаю»." },
 
@@ -226,6 +226,20 @@
       });
       if (q.short) ta.style.minHeight = "64px";
       body.appendChild(ta);
+    } else if (q.type === "list") {
+      var list = el("div", { class: "list" });
+      for (var i = 1; i <= q.count; i++) {
+        list.appendChild(el("div", { class: "list-row" }, [
+          el("span", { class: "list-num", "aria-hidden": "true", text: String(i) }),
+          el("input", {
+            type: "text", name: q.id + "." + i, maxlength: String(MAX_TEXT),
+            placeholder: (q.placeholders && q.placeholders[i - 1]) || "", autocomplete: "off",
+            "aria-label": q.label + ", задача " + i,
+            "aria-required": q.required && i === 1 ? "true" : null, "aria-describedby": describedBy
+          })
+        ]));
+      }
+      body.appendChild(list);
     } else if (q.type === "single" || q.type === "multi") {
       var kind = q.type === "single" ? "radio" : "checkbox";
       var longest = q.options.reduce(function (m, o) { return Math.max(m, o.length); }, 0);
@@ -291,6 +305,10 @@
     QUESTIONS.forEach(function (q) {
       if (q.type === "text" || q.type === "textarea") {
         result[q.id] = (form.elements[q.id].value || "").trim();
+      } else if (q.type === "list") {
+        var items = [];
+        for (var k = 1; k <= q.count; k++) items.push((form.elements[q.id + "." + k].value || "").trim());
+        result[q.id] = items;
       } else if (q.type === "single") {
         var r = form.querySelector('input[name="' + q.id + '"]:checked');
         result[q.id] = r ? r.value : "";
@@ -315,6 +333,7 @@
   function isAnswered(q, v) {
     if (v == null) return false;
     if (q.type === "multi") return Array.isArray(v) && v.length > 0;
+    if (q.type === "list") return Array.isArray(v) && v.some(function (x) { return x; });
     if (q.type === "matrix") return typeof v === "object" && Object.keys(v).some(function (k) { return v[k]; });
     return !!v;
   }
@@ -336,6 +355,8 @@
         if (v != null) {
           if (q.type === "text" || q.type === "textarea") {
             if (typeof v === "string") form.elements[q.id].value = v;
+          } else if (q.type === "list") {
+            if (Array.isArray(v)) v.forEach(function (x, i) { if (typeof x === "string" && i < q.count) form.elements[q.id + "." + (i + 1)].value = x; });
           } else if (q.type === "single") {
             if (typeof v === "string") setChecked(q.id, v);
           } else if (q.type === "multi") {
@@ -377,12 +398,6 @@
 
   // ---------- проверка ----------
 
-  function taskLines(text) {
-    return String(text || "").split("\n")
-      .map(function (l) { return l.replace(/^\s*\d+[.)]\s*/, "").trim(); })
-      .filter(Boolean);
-  }
-
   function markInvalid(q, message) {
     var wrap = document.getElementById("q-" + q.id);
     var err = document.getElementById("err-" + q.id);
@@ -408,10 +423,9 @@
     if (q.required && !isAnswered(q, answers[q.id])) {
       return q.type === "multi" ? "Отметьте хотя бы один вариант."
         : q.type === "single" ? "Выберите один вариант."
-        : q.id === "tasks" ? "Напишите хотя бы одну задачу."
+        : q.type === "list" ? "Напишите хотя бы одну задачу."
         : "Заполните это поле.";
     }
-    if (q.id === "tasks" && taskLines(answers.tasks).length < 1) return "Напишите хотя бы одну задачу.";
     if (otherMissing(q)) return "Впишите свой вариант.";
     return "";
   }
@@ -438,6 +452,7 @@
     var v = answers[q.id];
     var otherText = answers[q.id + "_other"];
     var withOther = function (x) { return x === OTHER && otherText ? OTHER + ": " + otherText : x; };
+    if (q.type === "list") return v.filter(Boolean).map(function (x, i) { return (i + 1) + ". " + x; }).join("\n");
     if (Array.isArray(v)) return v.map(withOther).join("; ");
     return withOther(v);
   }

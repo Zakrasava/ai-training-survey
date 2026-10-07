@@ -184,6 +184,11 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 .opt.other .other-input { position: relative; z-index: 1; display: block; opacity: 1; flex: 1 1 100%; margin: 10px 0 2px; width: 100%; min-height: 44px; padding: 9px 12px; font-size: 15.5px; }
 .opt.other .other-input[hidden] { display: none; }
 
+/* список задач */
+.list { display: grid; gap: 10px; }
+.list-row { display: grid; grid-template-columns: 34px minmax(0, 1fr); align-items: center; gap: 0; }
+.list-num { color: var(--accent); font-weight: 700; font-variant-numeric: tabular-nums; }
+
 /* матрица */
 .matrix { display: grid; gap: 0; border-top: 1px solid var(--line); }
 .matrix-row { display: grid; grid-template-columns: minmax(0, 1fr) 372px; gap: 20px; align-items: center; padding: 18px 0; border-bottom: 1px solid var(--line); }
