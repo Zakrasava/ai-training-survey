@@ -2,40 +2,44 @@
   "use strict";
 
   var CONFIG = window.SURVEY_CONFIG || {};
-  var DRAFT_KEY = "survey-draft-v1";
-  var SENT_KEY = "survey-sent-v1";
-  var ID_KEY = "survey-id-v1";
+  var DRAFT_KEY = "survey-draft-v2";
+  var SENT_KEY = "survey-sent-v2";
+  var ID_KEY = "survey-id-v2";
   var SEND_TIMEOUT_MS = 20000;
   // Согласовано с LIMITS.value в apps-script/Code.gs (5000): сервер отклоняет более длинные значения.
   var MAX_TEXT = 200;
   var MAX_TEXTAREA = 3000;
+  var OTHER = "Другое";
 
   var BLOCKS = [
-    { id: "A", title: "Кто вы", note: "Три вопроса, чтобы собрать группы по направлениям." },
-    { id: "B", title: "Как сейчас пользуетесь ИИ", note: "Честные ответы важнее правильных. Здесь нет оценок." },
-    { id: "C", title: "Что хотите от обучения", note: "Ваши задачи станут материалом для практики на втором и третьем занятии." },
-    { id: "D", title: "Организация", note: "Чтобы выбрать формат и время, удобные большинству." }
+    { id: "A", title: "Кто вы", note: "Чтобы собрать группы по направлениям." },
+    { id: "B", title: "Как пользуетесь ИИ", note: "Честные ответы важнее правильных. Здесь нет оценок." },
+    { id: "C", title: "Рабочая среда и задачи", note: "Чтобы на занятиях показывать примеры в ваших программах и на ваших задачах." },
+    { id: "D", title: "Занятие", note: "Занятия пройдут онлайн." }
   ];
 
   var QUESTIONS = [
     { id: "name", block: "A", type: "text", label: "Имя и фамилия", required: true, placeholder: "Иван Петров", column: "Имя и фамилия" },
     { id: "direction", block: "A", type: "single", label: "Направление", required: true, column: "Направление",
-      options: ["Рестораны", "Земля и девелопмент", "Недвижимость в Дубае", "Общие функции: финансы, маркетинг, HR, юристы", "Руководство холдинга"] },
+      options: ["Рестораны", "Земля и девелопмент", "Недвижимость в Дубае", "Общие функции: финансы, маркетинг, HR, юристы", "Руководство холдинга"],
+      other: "Какое направление" },
     { id: "role", block: "A", type: "text", label: "Должность или чем занимаетесь, одной строкой", required: true, placeholder: "Управляющий ресторана", column: "Должность" },
 
     { id: "tools", block: "B", type: "multi", label: "Какими ИИ пользуетесь", required: true, column: "Инструменты",
-      options: ["ChatGPT", "Claude", "GigaChat", "YandexGPT", "DeepSeek", "Gemini", "Другое"], exclusive: "Не пользуюсь" },
+      options: ["ChatGPT", "Claude", "GigaChat", "YandexGPT", "DeepSeek", "Gemini"], other: "Какой именно", exclusive: "Не пользуюсь" },
     { id: "frequency", block: "B", type: "single", label: "Как часто", required: true, column: "Частота",
       options: ["Ежедневно", "Несколько раз в неделю", "Несколько раз в месяц", "Не пользуюсь"] },
     { id: "account", block: "B", type: "single", label: "Какой у вас аккаунт", column: "Аккаунт",
       options: ["Бесплатный", "Платный личный", "Корпоративный", "Нет аккаунта"] },
     { id: "uses", block: "B", type: "multi", label: "Для чего уже используете", column: "Для чего используют",
-      options: ["Тексты и письма", "Переводы", "Поиск и сводки", "Таблицы и расчёты", "Идеи и планы", "Документы и договоры", "Картинки и презентации", "Другое"] },
+      options: ["Тексты и письма", "Переводы", "Поиск информации и сводки", "Таблицы, расчёты, анализ данных", "Документы и договоры", "Презентации и картинки", "Код, скрипты, приложения", "Автоматизации и боты", "Идеи и планирование", "Общение с клиентами: ответы, скрипты продаж"],
+      other: "Что ещё" },
+    { id: "where", block: "B", type: "multi", label: "Где именно пользуетесь ИИ", column: "Где пользуются",
+      hint: "Можно отметить несколько.",
+      options: ["В браузере, на сайте ChatGPT или Claude", "В приложении на компьютере", "В приложении на телефоне", "Через Telegram-ботов", "Встроено в рабочие программы: Copilot, Gemini в Google Документах и т. п."],
+      other: "Где ещё" },
     { id: "barriers", block: "B", type: "multi", label: "Что мешает пользоваться больше", column: "Что мешает",
       options: ["Не доверяю результату", "Не знаю, как сформулировать", "Долго проверять", "Опасаюсь за данные", "Нет времени разбираться", "Нет доступа к инструменту"], exclusive: "Ничего не мешает" },
-    { id: "sensitive", block: "B", type: "single", label: "Вставляли ли в ИИ рабочие документы с данными клиентов или договоры", column: "Вставляли данные клиентов",
-      hint: "Это не проверка. Ответ нужен, чтобы правильно рассказать о границах данных.",
-      options: ["Да", "Нет", "Не уверен"] },
     { id: "features", block: "B", type: "matrix", label: "Что из этого знаете или используете", column: "Функции",
       cols: ["Пользуюсь", "Слышал", "Не знаю"],
       rows: [
@@ -47,24 +51,18 @@
         { id: "agents", label: "Агентный режим, агенты", column: "Функции: агенты" }
       ] },
 
+    { id: "programs", block: "C", type: "multi", label: "В каких программах работаете каждый день", column: "Рабочие программы",
+      hint: "Чтобы показать, как доставать документы и данные из ваших систем.",
+      options: ["Excel или Google Таблицы", "Word или Google Документы", "1С", "Битрикс24", "amoCRM", "Другая CRM", "iiko, r_keeper или другая ресторанная система", "Почта: Outlook, Gmail", "Telegram", "WhatsApp", "Property Finder, Bayut или другие порталы недвижимости", "Notion или другая база знаний"],
+      other: "Какие ещё" },
     { id: "tasks", block: "C", type: "textarea", label: "Три рабочие задачи, которые хотели бы отдать ИИ", required: true, column: "Три задачи",
       hint: "По одной на строку, хотя бы одну. Чем конкретнее, тем точнее практика: не «письма», а «ответы на отзывы гостей на Яндекс Картах».",
       placeholder: "1. \n2. \n3. " },
     { id: "agentDef", block: "C", type: "textarea", short: true, label: "Что для вас «ИИ-агент», одним предложением", column: "Что такое агент",
       hint: "Любой ответ подходит, в том числе «не знаю»." },
-    { id: "success", block: "C", type: "multi", label: "Что будет для вас успехом курса", column: "Успех курса",
-      options: ["Экономия времени на конкретной задаче", "Меньше ошибок в документах", "Новые идеи для продаж или контента", "Понимание, что заказывать у подрядчиков", "Другое"] },
 
-    { id: "device", block: "D", type: "single", label: "Чем будете работать на занятии", required: true, column: "Устройство",
-      options: ["Ноутбук", "Планшет", "Только телефон"] },
-    { id: "format", block: "D", type: "single", label: "Какой формат удобнее", required: true, column: "Формат",
-      options: ["Очно", "Онлайн", "Без разницы"] },
-    { id: "time", block: "D", type: "multi", label: "Удобное время", column: "Удобное время",
-      options: ["Будни, утро", "Будни, день", "Будни, вечер", "Выходные"] },
-    { id: "language", block: "D", type: "single", label: "Язык материалов", column: "Язык материалов",
-      options: ["Русский", "Английский", "Оба"] },
-    { id: "homework", block: "D", type: "single", label: "Сколько времени готовы тратить на домашнее задание между занятиями", column: "Время на домашнее задание",
-      options: ["Не готов", "30 минут", "1 час", "Больше часа"] }
+    { id: "device", block: "D", type: "single", label: "С какого устройства будете подключаться", required: true, column: "Устройство",
+      options: ["Ноутбук или компьютер", "Планшет", "Только телефон"] }
   ];
 
   var form = document.getElementById("form");
@@ -167,14 +165,38 @@
   }
 
   function inputsOf(q) {
-    return form.querySelectorAll('#q-' + q.id + ' input, #q-' + q.id + ' textarea');
+    return form.querySelectorAll("#q-" + q.id + " input, #q-" + q.id + " textarea");
+  }
+
+  function otherInput(q) {
+    return form.querySelector('input[name="' + q.id + '_other"]');
+  }
+
+  function otherChecked(q) {
+    var i = form.querySelector('input[name="' + q.id + '"][value="' + OTHER + '"]');
+    return !!(i && i.checked);
+  }
+
+  function syncOther(q) {
+    var oi = otherInput(q);
+    if (!oi) return;
+    var on = otherChecked(q);
+    oi.hidden = !on;
+    if (!on) oi.value = "";
   }
 
   // ---------- построение формы ----------
 
-  function buildOption(q, value, kind) {
+  function buildOption(q, value, kind, isOther) {
     var input = el("input", { type: kind, name: q.id, value: value });
-    return el("label", { class: "opt" }, [input, el("span", { text: value })]);
+    var label = el("label", { class: "opt" + (isOther ? " other" : "") }, [input, el("span", { text: value })]);
+    if (isOther) {
+      label.appendChild(el("input", {
+        type: "text", name: q.id + "_other", class: "other-input", hidden: true,
+        placeholder: q.other, maxlength: String(MAX_TEXT), "aria-label": q.label + ": свой вариант"
+      }));
+    }
+    return label;
   }
 
   function buildQuestion(q, index) {
@@ -205,13 +227,19 @@
       body.appendChild(ta);
     } else if (q.type === "single" || q.type === "multi") {
       var kind = q.type === "single" ? "radio" : "checkbox";
-      var opts = el("div", { class: "opts", role: q.type === "single" ? "radiogroup" : "group", "aria-label": q.label, "aria-required": q.required ? "true" : null, "aria-describedby": describedBy });
-      q.options.forEach(function (o) { opts.appendChild(buildOption(q, o, kind)); });
+      var longest = q.options.reduce(function (m, o) { return Math.max(m, o.length); }, 0);
+      var opts = el("div", {
+        class: "opts" + (longest > 44 ? " single-col" : ""),
+        role: q.type === "single" ? "radiogroup" : "group", "aria-label": q.label,
+        "aria-required": q.required ? "true" : null, "aria-describedby": describedBy
+      });
+      q.options.forEach(function (o) { opts.appendChild(buildOption(q, o, kind, false)); });
       if (q.exclusive) {
-        var ex = buildOption(q, q.exclusive, kind);
+        var ex = buildOption(q, q.exclusive, kind, false);
         ex.querySelector("input").setAttribute("data-exclusive", "1");
         opts.appendChild(ex);
       }
+      if (q.other) opts.appendChild(buildOption(q, OTHER, kind, true));
       body.appendChild(opts);
     } else if (q.type === "matrix") {
       var m = el("div", { class: "matrix", role: "group", "aria-label": q.label });
@@ -240,17 +268,21 @@
   function build() {
     var submitRow = form.querySelector(".submit-row");
     var qIndex = 0;
-    BLOCKS.forEach(function (b) {
+    BLOCKS.forEach(function (b, bi) {
       var sec = el("section", { class: "block", id: "block-" + b.id, "aria-labelledby": "bt-" + b.id });
-      sec.appendChild(el("h2", { class: "block-title", id: "bt-" + b.id, text: b.title }));
+      sec.appendChild(el("div", { class: "block-head" }, [
+        el("span", { class: "block-num", text: "Раздел " + (bi + 1) }),
+        el("h2", { class: "block-title", id: "bt-" + b.id, text: b.title })
+      ]));
       sec.appendChild(el("p", { class: "block-note", text: b.note }));
       var list = QUESTIONS.filter(function (q) { return q.block === b.id; });
       list.forEach(function (q) { sec.appendChild(buildQuestion(q, qIndex++)); });
       form.insertBefore(sec, submitRow);
 
+      var seg = el("span", { class: "seg", "aria-hidden": "true" }, [el("i")]);
       var li = el("li", { "data-block": b.id }, [
-        el("a", { href: "#block-" + b.id, text: b.title }),
-        el("small", { text: "0 из " + list.length })
+        seg,
+        el("a", { href: "#block-" + b.id, text: b.title })
       ]);
       blocksEl.appendChild(li);
     });
@@ -282,6 +314,10 @@
         });
         result[q.id] = m;
       }
+      if (q.other) {
+        var oi = otherInput(q);
+        result[q.id + "_other"] = oi && otherChecked(q) ? (oi.value || "").trim() : "";
+      }
     });
     return result;
   }
@@ -293,6 +329,10 @@
     return !!v;
   }
 
+  function otherMissing(q) {
+    return !!q.other && otherChecked(q) && !answers[q.id + "_other"];
+  }
+
   function setChecked(name, value) {
     var c = form.querySelector('input[name="' + name + '"][value="' + cssEscape(value) + '"]');
     if (c) c.checked = true;
@@ -302,23 +342,32 @@
     if (!draft || typeof draft !== "object") return;
     QUESTIONS.forEach(function (q) {
       var v = draft[q.id];
-      if (v == null) return;
       try {
-        if (q.type === "text" || q.type === "textarea") {
-          if (typeof v === "string") form.elements[q.id].value = v;
-        } else if (q.type === "single") {
-          if (typeof v === "string") setChecked(q.id, v);
-        } else if (q.type === "multi") {
-          if (!Array.isArray(v)) return;
-          var list = v.filter(function (x) { return typeof x === "string"; });
-          // Исключающий вариант не сочетается с остальными: он побеждает.
-          if (q.exclusive && list.indexOf(q.exclusive) !== -1) list = [q.exclusive];
-          list.forEach(function (val) { setChecked(q.id, val); });
-        } else if (q.type === "matrix") {
-          if (typeof v !== "object") return;
-          q.rows.forEach(function (row) {
-            if (typeof v[row.id] === "string" && v[row.id]) setChecked(q.id + "." + row.id, v[row.id]);
-          });
+        if (v != null) {
+          if (q.type === "text" || q.type === "textarea") {
+            if (typeof v === "string") form.elements[q.id].value = v;
+          } else if (q.type === "single") {
+            if (typeof v === "string") setChecked(q.id, v);
+          } else if (q.type === "multi") {
+            if (Array.isArray(v)) {
+              var list = v.filter(function (x) { return typeof x === "string"; });
+              // Исключающий вариант не сочетается с остальными: он побеждает.
+              if (q.exclusive && list.indexOf(q.exclusive) !== -1) list = [q.exclusive];
+              list.forEach(function (val) { setChecked(q.id, val); });
+            }
+          } else if (q.type === "matrix") {
+            if (typeof v === "object") {
+              q.rows.forEach(function (row) {
+                if (typeof v[row.id] === "string" && v[row.id]) setChecked(q.id + "." + row.id, v[row.id]);
+              });
+            }
+          }
+        }
+        if (q.other) {
+          syncOther(q);
+          var ov = draft[q.id + "_other"];
+          var oi = otherInput(q);
+          if (oi && otherChecked(q) && typeof ov === "string") oi.value = ov;
         }
       } catch (e) { /* одно испорченное поле не должно ломать остальные */ }
     });
@@ -346,7 +395,7 @@
       var isCurrent = !done && !currentSet;
       if (isCurrent) currentSet = true;
       li.classList.toggle("current", isCurrent);
-      li.querySelector("small").textContent = (blockDone[b] || 0) + " из " + blockTotal[b];
+      li.querySelector(".seg i").style.width = Math.round(100 * (blockDone[b] || 0) / blockTotal[b]) + "%";
     });
 
     storage("set", DRAFT_KEY, JSON.stringify(answers));
@@ -381,19 +430,22 @@
     return invalid ? wrap : null;
   }
 
+  function messageFor(q) {
+    if (q.required && !isAnswered(q, answers[q.id])) {
+      return q.type === "multi" ? "Отметьте хотя бы один вариант."
+        : q.type === "single" ? "Выберите один вариант."
+        : q.id === "tasks" ? "Напишите хотя бы одну задачу."
+        : "Заполните это поле.";
+    }
+    if (q.id === "tasks" && taskLines(answers.tasks).length < 1) return "Напишите хотя бы одну задачу.";
+    if (otherMissing(q)) return "Впишите свой вариант.";
+    return "";
+  }
+
   function validate() {
     var firstInvalid = null;
     QUESTIONS.forEach(function (q) {
-      var message = "";
-      if (q.required && !isAnswered(q, answers[q.id])) {
-        message = q.type === "multi" ? "Отметьте хотя бы один вариант."
-          : q.type === "single" ? "Выберите один вариант."
-          : q.id === "tasks" ? "Напишите хотя бы одну задачу."
-          : "Заполните это поле.";
-      } else if (q.id === "tasks" && taskLines(answers.tasks).length < 1) {
-        message = "Напишите хотя бы одну задачу.";
-      }
-      var wrap = markInvalid(q, message);
+      var wrap = markInvalid(q, messageFor(q));
       if (wrap && !firstInvalid) firstInvalid = wrap;
     });
     return firstInvalid;
@@ -403,12 +455,18 @@
     var wrap = target.closest(".q");
     if (!wrap || !wrap.classList.contains("invalid")) return;
     var q = findQuestion(wrap.getAttribute("data-id"));
-    if (!q) return;
-    var ok = isAnswered(q, answers[q.id]) && (q.id !== "tasks" || taskLines(answers.tasks).length >= 1);
-    if (ok) markInvalid(q, "");
+    if (q && !messageFor(q)) markInvalid(q, "");
   }
 
   // ---------- отправка ----------
+
+  function valueFor(q) {
+    var v = answers[q.id];
+    var otherText = answers[q.id + "_other"];
+    var withOther = function (x) { return x === OTHER && otherText ? OTHER + ": " + otherText : x; };
+    if (Array.isArray(v)) return v.map(withOther).join("; ");
+    return withOther(v);
+  }
 
   function flatten() {
     var columns = [["Отправлено", "submittedAt"], ["ID отправки", "submissionId"]];
@@ -421,7 +479,7 @@
         });
       } else {
         columns.push([q.column, q.id]);
-        values[q.id] = Array.isArray(answers[q.id]) ? answers[q.id].join("; ") : answers[q.id];
+        values[q.id] = valueFor(q);
       }
     });
     return { v: 1, columns: columns, values: values };
@@ -430,14 +488,12 @@
   function asText() {
     var lines = ["Опросник перед обучением"];
     QUESTIONS.forEach(function (q, i) {
-      var v = answers[q.id];
       var text;
       if (q.type === "matrix") {
+        var v = answers[q.id];
         text = q.rows.map(function (r) { return v[r.id] ? r.label + " — " + v[r.id] : null; }).filter(Boolean).join("; ");
-      } else if (Array.isArray(v)) {
-        text = v.join("; ");
       } else {
-        text = v;
+        text = valueFor(q);
       }
       lines.push((i + 1) + ". " + q.label + ": " + (text || "—"));
     });
@@ -569,7 +625,8 @@
     var firstInvalid = validate();
     if (firstInvalid) {
       firstInvalid.scrollIntoView({ behavior: "smooth", block: "center" });
-      var focusable = firstInvalid.querySelector("input, textarea");
+      var fq = findQuestion(firstInvalid.getAttribute("data-id"));
+      var focusable = fq && otherMissing(fq) ? otherInput(fq) : firstInvalid.querySelector("input:not([hidden]), textarea");
       if (focusable) focusable.focus({ preventScroll: true });
       return;
     }
@@ -600,6 +657,13 @@
         Array.prototype.forEach.call(group, function (i) { if (i !== t) i.checked = false; });
       } else if (t.checked) {
         Array.prototype.forEach.call(group, function (i) { if (i.hasAttribute("data-exclusive")) i.checked = false; });
+      }
+    }
+    if (t.type === "checkbox" || t.type === "radio") {
+      var q = findQuestion(t.name);
+      if (q && q.other) {
+        syncOther(q);
+        if (t.value === OTHER && t.checked) otherInput(q).focus();
       }
     }
     updateProgress();
