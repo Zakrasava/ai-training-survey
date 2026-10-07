@@ -234,12 +234,12 @@
         "aria-required": q.required ? "true" : null, "aria-describedby": describedBy
       });
       q.options.forEach(function (o) { opts.appendChild(buildOption(q, o, kind, false)); });
+      if (q.other) opts.appendChild(buildOption(q, OTHER, kind, true));
       if (q.exclusive) {
         var ex = buildOption(q, q.exclusive, kind, false);
         ex.querySelector("input").setAttribute("data-exclusive", "1");
         opts.appendChild(ex);
       }
-      if (q.other) opts.appendChild(buildOption(q, OTHER, kind, true));
       body.appendChild(opts);
     } else if (q.type === "matrix") {
       var m = el("div", { class: "matrix", role: "group", "aria-label": q.label });
