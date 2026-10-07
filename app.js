@@ -426,18 +426,27 @@
       }
     }
     updateProgress();
-    var wrap = t.closest(".q");
-    if (wrap && wrap.classList.contains("invalid")) {
-      var q = QUESTIONS.filter(function (x) { return x.id === wrap.getAttribute("data-id"); })[0];
-      if (q && isAnswered(q, answers[q.id])) {
-        wrap.classList.remove("invalid");
-        document.getElementById("err-" + q.id).textContent = "";
-      }
+    clearInvalid(t);
+  });
+  // Для текстовых полей ошибка снимается уже при вводе, а не при потере фокуса:
+  // иначе сообщение исчезает в момент клика по следующему варианту, верстка
+  // сдвигается между нажатием и отпусканием, и клик теряется.
+  form.addEventListener("input", function (e) {
+    if (e.target.matches("input[type=text], textarea")) {
+      updateProgress();
+      clearInvalid(e.target);
     }
   });
-  form.addEventListener("input", function (e) {
-    if (e.target.matches("input[type=text], textarea")) updateProgress();
-  });
+
+  function clearInvalid(target) {
+    var wrap = target.closest(".q");
+    if (!wrap || !wrap.classList.contains("invalid")) return;
+    var q = QUESTIONS.filter(function (x) { return x.id === wrap.getAttribute("data-id"); })[0];
+    if (q && isAnswered(q, answers[q.id])) {
+      wrap.classList.remove("invalid");
+      document.getElementById("err-" + q.id).textContent = "";
+    }
+  }
   form.addEventListener("submit", function (e) { e.preventDefault(); submit(); });
 
   // ---------- старт ----------
