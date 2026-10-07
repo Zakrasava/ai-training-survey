@@ -109,7 +109,8 @@ function parsePayload_(e) {
     var v = payload.values[k];
     if (v != null && typeof v !== "string") payload.values[k] = String(v);
     if (typeof payload.values[k] === "string" && payload.values[k].length > LIMITS.value) {
-      payload.values[k] = payload.values[k].slice(0, LIMITS.value);
+      // Не обрезать молча: клиент покажет ошибку и сохранит черновик.
+      throw new Error("Ответ длиннее " + LIMITS.value + " символов: " + k);
     }
   });
   return payload;

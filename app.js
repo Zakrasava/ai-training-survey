@@ -6,6 +6,9 @@
   var SENT_KEY = "survey-sent-v1";
   var ID_KEY = "survey-id-v1";
   var SEND_TIMEOUT_MS = 20000;
+  // Согласовано с LIMITS.value в apps-script/Code.gs (5000): сервер отклоняет более длинные значения.
+  var MAX_TEXT = 200;
+  var MAX_TEXTAREA = 3000;
 
   var BLOCKS = [
     { id: "A", title: "Кто вы", note: "Три вопроса, чтобы собрать группы по направлениям." },
@@ -102,15 +105,18 @@
     } catch (e) { return false; }
   })();
 
+  // Чтение и запись разделены: при исчерпанной квоте запись падает, а ранее
+  // сохранённый черновик по-прежнему читается. Всё записанное дублируется в память,
+  // чтобы при сбое записи не потерять идентификатор отправки.
   function storage(action, key, value) {
-    if (!storageOk) {
-      if (action === "get") return memoryStore[key] == null ? null : memoryStore[key];
-      if (action === "set") memoryStore[key] = value;
-      if (action === "remove") delete memoryStore[key];
-      return null;
+    if (action === "get") {
+      if (memoryStore[key] != null) return memoryStore[key];
+      try { return window.localStorage.getItem(key); } catch (e) { return null; }
     }
+    if (action === "set") memoryStore[key] = value;
+    if (action === "remove") delete memoryStore[key];
+    if (!storageOk) return null;
     try {
-      if (action === "get") return window.localStorage.getItem(key);
       if (action === "set") window.localStorage.setItem(key, value);
       if (action === "remove") window.localStorage.removeItem(key);
     } catch (e) {
@@ -186,14 +192,14 @@
 
     if (q.type === "text") {
       body.appendChild(el("input", {
-        type: "text", name: q.id, placeholder: q.placeholder || "",
+        type: "text", name: q.id, placeholder: q.placeholder || "", maxlength: String(MAX_TEXT),
         autocomplete: q.id === "name" ? "name" : "off", "aria-label": q.label,
         "aria-required": q.required ? "true" : null, "aria-describedby": describedBy
       }));
     } else if (q.type === "textarea") {
       var ta = el("textarea", {
-        name: q.id, placeholder: q.placeholder || "", rows: q.short ? 2 : 4, "aria-label": q.label,
-        "aria-required": q.required ? "true" : null, "aria-describedby": describedBy
+        name: q.id, placeholder: q.placeholder || "", rows: q.short ? 2 : 4, maxlength: String(MAX_TEXTAREA),
+        "aria-label": q.label, "aria-required": q.required ? "true" : null, "aria-describedby": describedBy
       });
       if (q.short) ta.style.minHeight = "64px";
       body.appendChild(ta);
@@ -454,7 +460,13 @@
 
   function showManualCopy(panel, text) {
     var existing = panel.querySelector(".manual-copy");
-    if (existing) { existing.querySelector("textarea").focus(); return; }
+    if (existing) {
+      var old = existing.querySelector("textarea");
+      old.value = text;
+      old.focus();
+      old.select();
+      return;
+    }
     var box = el("div", { class: "manual-copy" }, [
       el("p", { text: "Скопировать автоматически не получилось. Выделите текст ниже и скопируйте вручную." }),
       el("textarea", { readonly: true, rows: 8, "aria-label": "Ваши ответы текстом" })
