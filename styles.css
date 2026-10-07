@@ -92,6 +92,33 @@ body {
 
 .notice { margin: 0 0 20px; padding: 14px 18px; border: 1px solid var(--line-strong); border-radius: var(--r-sm); background: var(--accent-soft); font-size: 15px; }
 
+.draft-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin: 0 0 20px;
+  padding: 12px 18px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-sm);
+  background: var(--card);
+  color: var(--ink-2);
+  font-size: 15px;
+}
+.btn.link {
+  min-height: 0;
+  padding: 4px 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font-size: 15px;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.btn.link:hover { color: var(--ink); }
+
 /* карточки */
 .form { margin: 0; }
 .block, .card, .submit-card {

@@ -662,4 +662,33 @@
     try { applyDraft(JSON.parse(draft)); } catch (e) { /* испорченный черновик игнорируем */ }
   }
   updateProgress();
+  showDraftBar();
+
+  // Плашка «восстановлен черновик»: объясняет, откуда взялись ответы при открытии, и даёт сбросить их.
+  function showDraftBar() {
+    var answered = QUESTIONS.filter(function (q) { return isAnswered(q, answers[q.id]); }).length;
+    if (!answered) return;
+    var bar = el("div", { class: "draft-bar", role: "status" }, [
+      el("span", { text: "Восстановлен черновик: " + answered + " " + plural(answered, "ответ", "ответа", "ответов") + " с этого устройства." }),
+      el("button", { type: "button", class: "btn link", text: "Начать заново" })
+    ]);
+    bar.querySelector("button").addEventListener("click", function () {
+      storage("remove", DRAFT_KEY);
+      storage("remove", ID_KEY);
+      form.reset();
+      QUESTIONS.forEach(function (q) { if (q.other) syncOther(q); });
+      QUESTIONS.forEach(function (q) { markInvalid(q, ""); });
+      updateProgress();
+      bar.remove();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+    form.parentNode.insertBefore(bar, form);
+  }
+
+  function plural(n, one, few, many) {
+    var m10 = n % 10, m100 = n % 100;
+    if (m10 === 1 && m100 !== 11) return one;
+    if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few;
+    return many;
+  }
 })();
