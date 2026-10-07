@@ -3,39 +3,33 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="color-scheme" content="light">
+<meta name="color-scheme" content="dark">
 <title>Опросник перед обучением</title>
 <meta name="description" content="Опросник перед обучением работе с ИИ.">
 <meta name="robots" content="noindex">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Prata&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 <a class="skip" href="#form">К вопросам</a>
+<div class="bg" aria-hidden="true"></div>
 
-<header class="hero">
-  <div class="hero-inner">
+<div class="page">
+  <header class="hero">
     <p class="hero-kicker">Обучение работе с ИИ</p>
     <h1 class="title">Опросник перед первым занятием</h1>
     <p class="sub">15 вопросов, около пяти минут. По ответам занятия настраиваются под ваши задачи.</p>
-  </div>
-</header>
-
-<div class="page">
-  <div class="progress-card">
-    <div class="progress-head">
-      <span class="progress-label visually-hidden">Заполнено</span>
+    <div class="progress-card">
       <span class="counter" id="counter" aria-live="polite">Отвечено 0 из 15</span>
+      <div class="progress-track" aria-hidden="true"><i id="topline"></i></div>
     </div>
-    <div class="progress-track" aria-hidden="true"><i id="topline"></i></div>
-  </div>
+  </header>
 
   <div class="notice" id="notice" hidden role="status"></div>
 
   <form id="form" class="form" novalidate>
-    <!-- заполняется скриптом -->
     <div class="submit-card">
       <button type="submit" class="btn primary" id="submit">Отправить ответы</button>
       <p class="submit-hint">Черновик сохраняется на этом устройстве, пока вы не отправите ответы.</p>
