@@ -8,19 +8,29 @@
 <meta name="robots" content="noindex">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 <a class="skip" href="#form">К вопросам</a>
-<div class="topline" aria-hidden="true"><i id="topline"></i></div>
+
+<div class="hero">
+  <div class="hero-glow" aria-hidden="true"></div>
+  <div class="hero-inner">
+    <p class="hero-kicker">Обучение работе с ИИ</p>
+    <h1 class="title">Опросник перед первым занятием</h1>
+    <p class="sub">15 вопросов, около пяти минут. Ответы видят только Кирилл и Александр.</p>
+  </div>
+</div>
 
 <div class="page">
-  <header class="hero">
-    <h1 class="title">Опросник перед обучением</h1>
-    <p class="sub">15 вопросов, около пяти минут. Ответы видят только Кирилл и Александр.</p>
-    <p class="counter" id="counter" aria-live="polite">Отвечено 0 из 15</p>
-  </header>
+  <div class="progress-card">
+    <div class="progress-head">
+      <span class="progress-label">Заполнено</span>
+      <span class="counter" id="counter" aria-live="polite">Отвечено 0 из 15</span>
+    </div>
+    <div class="progress-track" aria-hidden="true"><i id="topline"></i></div>
+  </div>
 
   <div class="notice" id="notice" hidden role="status"></div>
 
