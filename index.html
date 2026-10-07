@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Опросник перед обучением</title>
+<meta name="description" content="18 вопросов перед тремя занятиями об ИИ: кто вы, как пользуетесь ИИ сейчас, что хотите от обучения.">
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=Piazzolla:opsz,wght@8..30,400;8..30,500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<a class="skip" href="#form">К вопросам</a>
+
+<div class="shell">
+  <aside class="rail" aria-label="Ход заполнения">
+    <div class="rail-inner">
+      <p class="kicker">Перед первым занятием</p>
+      <h1 class="title">Три занятия об&nbsp;ИИ.<br>С&nbsp;чего начинаем?</h1>
+      <p class="lede">18 вопросов, около пяти минут. Ответы видят только Кирилл и Александр и&nbsp;используют, чтобы настроить занятия под ваши задачи.</p>
+
+      <ol class="blocks" id="blocks" aria-label="Разделы">
+        <!-- заполняется скриптом -->
+      </ol>
+
+      <p class="counter" id="counter" aria-live="polite">Отвечено 0 из 18</p>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="notice" id="notice" hidden role="status"></div>
+
+    <form id="form" class="form" novalidate>
+      <!-- заполняется скриптом -->
+      <div class="submit-row">
+        <button type="submit" class="btn primary" id="submit">Отправить ответы</button>
+        <p class="submit-hint">Черновик сохраняется на этом устройстве, пока вы не отправите ответы.</p>
+      </div>
+      <div class="panel error" id="error" hidden role="alert"></div>
+    </form>
+
+    <section class="panel success" id="success" hidden tabindex="-1">
+      <h2 class="panel-title">Ответы отправлены</h2>
+      <p>Спасибо. Увидимся на первом занятии. Если захотите что-то добавить, напишите Кириллу в Telegram.</p>
+    </section>
+  </main>
+</div>
+
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
