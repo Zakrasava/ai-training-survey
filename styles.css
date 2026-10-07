@@ -358,7 +358,8 @@ a:focus-visible {
 }
 .opt:hover { border-color: var(--line-strong); background: var(--card); box-shadow: var(--shadow-sm); }
 
-.opt > input {
+.opt > input[type="radio"],
+.opt > input[type="checkbox"] {
   position: absolute;
   left: 0;
   top: 0;
@@ -399,22 +400,29 @@ a:focus-visible {
 
 .opt > span { min-width: 0; line-height: 1.45; }
 
-.opt:has(> input:checked) {
+.opt:has(> input[type="radio"]:checked),
+.opt:has(> input[type="checkbox"]:checked) {
   border-color: var(--accent);
   background: var(--accent-soft);
 }
-.opt:has(> input:checked) > span { font-weight: 600; color: var(--ink); }
-.opt:has(> input:checked)::before {
+.opt:has(> input[type="radio"]:checked) > span,
+.opt:has(> input[type="checkbox"]:checked) > span { font-weight: 600; color: var(--ink); }
+.opt:has(> input[type="radio"]:checked)::before,
+.opt:has(> input[type="checkbox"]:checked)::before {
   border-color: var(--accent);
   background: linear-gradient(135deg, var(--accent), var(--accent-2));
 }
-.opt:has(> input:checked)::after { transform: rotate(45deg) scale(1); }
-.opt:has(> input:focus-visible) { outline: 2px solid var(--focus); outline-offset: 2px; }
+.opt:has(> input[type="radio"]:checked)::after,
+.opt:has(> input[type="checkbox"]:checked)::after { transform: rotate(45deg) scale(1); }
+.opt:has(> input[type="radio"]:focus-visible),
+.opt:has(> input[type="checkbox"]:focus-visible) { outline: 2px solid var(--focus); outline-offset: 2px; }
 
 .opt.other { grid-column: 1 / -1; flex-wrap: wrap; }
 .opt.other .other-input {
   position: relative;
   z-index: 1;
+  display: block;
+  opacity: 1;
   flex: 1 1 100%;
   margin: 10px 0 2px;
   width: 100%;
