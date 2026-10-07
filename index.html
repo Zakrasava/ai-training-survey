@@ -4,46 +4,40 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Опросник перед обучением</title>
-<meta name="description" content="Опросник перед обучением работе с ИИ: кто вы, как пользуетесь ИИ сейчас, в каких программах работаете, какие задачи хотите отдать ИИ.">
+<meta name="description" content="Опросник перед обучением работе с ИИ.">
 <meta name="robots" content="noindex">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 <a class="skip" href="#form">К вопросам</a>
+<div class="topline" aria-hidden="true"><i id="topline"></i></div>
 
-<header class="band">
-  <div class="band-inner">
-    <div class="band-text">
-      <p class="band-title">Опросник перед обучением работе с ИИ</p>
-      <p class="band-sub">14 вопросов, около пяти минут. Ответы видят только Кирилл и Александр и используют, чтобы настроить занятия под ваши задачи.</p>
-    </div>
-    <p class="counter" id="counter" aria-live="polite">Отвечено 0 из 14</p>
-  </div>
-  <ol class="progress" id="blocks" aria-label="Разделы и ход заполнения">
-    <!-- заполняется скриптом -->
-  </ol>
-</header>
+<div class="page">
+  <header class="hero">
+    <h1 class="title">Опросник перед обучением</h1>
+    <p class="sub">15 вопросов, около пяти минут. Ответы видят только Кирилл и Александр.</p>
+    <p class="counter" id="counter" aria-live="polite">Отвечено 0 из 15</p>
+  </header>
 
-<main class="sheet">
   <div class="notice" id="notice" hidden role="status"></div>
 
   <form id="form" class="form" novalidate>
     <!-- заполняется скриптом -->
-    <div class="submit-row">
+    <div class="submit-card">
       <button type="submit" class="btn primary" id="submit">Отправить ответы</button>
       <p class="submit-hint">Черновик сохраняется на этом устройстве, пока вы не отправите ответы.</p>
+      <div class="panel error" id="error" hidden role="alert"></div>
     </div>
-    <div class="panel error" id="error" hidden role="alert"></div>
   </form>
 
-  <section class="panel success" id="success" hidden tabindex="-1">
-    <h2 class="panel-title">Ответы отправлены</h2>
+  <section class="card success" id="success" hidden tabindex="-1">
+    <h2 class="card-title">Ответы отправлены</h2>
     <p>Спасибо. Если захотите что-то добавить, напишите Кириллу в Telegram.</p>
   </section>
-</main>
+</div>
 
 <script src="config.js"></script>
 <script src="app.js"></script>

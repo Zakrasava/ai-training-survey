@@ -2,9 +2,9 @@
   "use strict";
 
   var CONFIG = window.SURVEY_CONFIG || {};
-  var DRAFT_KEY = "survey-draft-v2";
-  var SENT_KEY = "survey-sent-v2";
-  var ID_KEY = "survey-id-v2";
+  var DRAFT_KEY = "survey-draft-v3";
+  var SENT_KEY = "survey-sent-v3";
+  var ID_KEY = "survey-id-v3";
   var SEND_TIMEOUT_MS = 20000;
   // Согласовано с LIMITS.value в apps-script/Code.gs (5000): сервер отклоняет более длинные значения.
   var MAX_TEXT = 200;
@@ -12,10 +12,10 @@
   var OTHER = "Другое";
 
   var BLOCKS = [
-    { id: "A", title: "Кто вы", note: "Чтобы собрать группы по направлениям." },
-    { id: "B", title: "Как пользуетесь ИИ", note: "Честные ответы важнее правильных. Здесь нет оценок." },
-    { id: "C", title: "Рабочая среда и задачи", note: "Чтобы на занятиях показывать примеры в ваших программах и на ваших задачах." },
-    { id: "D", title: "Занятие", note: "Занятия пройдут онлайн." }
+    { id: "A", title: "Кто вы" },
+    { id: "B", title: "Как пользуетесь ИИ" },
+    { id: "C", title: "Работа и задачи" },
+    { id: "D", title: "Занятие" }
   ];
 
   var QUESTIONS = [
@@ -34,29 +34,30 @@
     { id: "uses", block: "B", type: "multi", label: "Для чего уже используете", column: "Для чего используют",
       options: ["Тексты и письма", "Переводы", "Поиск информации и сводки", "Таблицы, расчёты, анализ данных", "Документы и договоры", "Презентации и картинки", "Код, скрипты, приложения", "Автоматизации и боты", "Идеи и планирование", "Общение с клиентами: ответы, скрипты продаж"],
       other: "Что ещё" },
-    { id: "where", block: "B", type: "multi", label: "Где именно пользуетесь ИИ", column: "Где пользуются",
-      hint: "Можно отметить несколько.",
+    { id: "where", block: "B", type: "multi", label: "Где пользуетесь ИИ", column: "Где пользуются",
       options: ["В браузере, на сайте ChatGPT или Claude", "В приложении на компьютере", "В приложении на телефоне", "Через Telegram-ботов", "Встроено в рабочие программы: Copilot, Gemini в Google Документах и т. п."],
       other: "Где ещё" },
     { id: "barriers", block: "B", type: "multi", label: "Что мешает пользоваться больше", column: "Что мешает",
       options: ["Не доверяю результату", "Не знаю, как сформулировать", "Долго проверять", "Опасаюсь за данные", "Нет времени разбираться", "Нет доступа к инструменту"], exclusive: "Ничего не мешает" },
-    { id: "features", block: "B", type: "matrix", label: "Что из этого знаете или используете", column: "Функции",
-      cols: ["Пользуюсь", "Слышал", "Не знаю"],
+    { id: "features", block: "B", type: "matrix", label: "Какие возможности ИИ вам знакомы", column: "Функции",
+      cols: ["Пользуюсь", "Слышал", "Впервые слышу"],
       rows: [
-        { id: "instructions", label: "Постоянные инструкции ассистенту", column: "Функции: постоянные инструкции" },
-        { id: "projects", label: "Проекты с загруженными файлами", column: "Функции: проекты с файлами" },
-        { id: "memory", label: "Память ассистента", column: "Функции: память" },
-        { id: "custom", label: "Свои GPT или скиллы", column: "Функции: свои GPT / скиллы" },
-        { id: "research", label: "Глубокое исследование (Deep Research)", column: "Функции: Deep Research" },
-        { id: "agents", label: "Агентный режим, агенты", column: "Функции: агенты" }
+        { id: "instructions", label: "Постоянные инструкции", desc: "Один раз написали, кто вы и как отвечать, и ИИ учитывает это в каждом разговоре", column: "Функции: постоянные инструкции" },
+        { id: "projects", label: "Проекты с файлами", desc: "Папка в ChatGPT или Claude с вашими документами: ИИ отвечает по ним", column: "Функции: проекты с файлами" },
+        { id: "memory", label: "Память", desc: "ИИ сам запоминает факты о вас и вашей работе между разговорами", column: "Функции: память" },
+        { id: "custom", label: "Свой помощник под задачу", desc: "Настроенный GPT или скилл, например «ответ на отзыв гостя» в нужном тоне", column: "Функции: свои GPT / скиллы" },
+        { id: "research", label: "Глубокое исследование", desc: "ИИ сам 10–20 минут ищет по сотням сайтов и пишет отчёт со ссылками", column: "Функции: Deep Research" },
+        { id: "agents", label: "Агенты", desc: "ИИ сам выполняет цепочку действий: открывает сайты, заполняет таблицы, готовит письма", column: "Функции: агенты" }
       ] },
 
-    { id: "programs", block: "C", type: "multi", label: "В каких программах работаете каждый день", column: "Рабочие программы",
-      hint: "Чтобы показать, как доставать документы и данные из ваших систем.",
+    { id: "programs", block: "C", type: "multi", label: "В каких программах работаете", column: "Рабочие программы",
       options: ["Excel или Google Таблицы", "Word или Google Документы", "1С", "Битрикс24", "amoCRM", "Другая CRM", "iiko, r_keeper или другая ресторанная система", "Почта: Outlook, Gmail", "Telegram", "WhatsApp", "Property Finder, Bayut или другие порталы недвижимости", "Notion или другая база знаний"],
       other: "Какие ещё" },
+    { id: "docs", block: "C", type: "multi", label: "С какими документами и текстами работаете каждую неделю", column: "Документы",
+      options: ["Переписка с клиентами и гостями", "Отзывы", "Договоры и юридические документы", "Коммерческие предложения и прайсы", "Таблицы с выручкой и расходами", "Отчёты руководству", "Объявления и описания объектов", "Меню и описания блюд", "Презентации", "Регламенты и инструкции"],
+      other: "Что ещё" },
     { id: "tasks", block: "C", type: "textarea", label: "Три рабочие задачи, которые хотели бы отдать ИИ", required: true, column: "Три задачи",
-      hint: "По одной на строку, хотя бы одну. Чем конкретнее, тем точнее практика: не «письма», а «ответы на отзывы гостей на Яндекс Картах».",
+      hint: "По одной на строку. Чем конкретнее, тем лучше: не «письма», а «ответы на отзывы гостей на Яндекс Картах».",
       placeholder: "1. \n2. \n3. " },
     { id: "agentDef", block: "C", type: "textarea", short: true, label: "Что для вас «ИИ-агент», одним предложением", column: "Что такое агент",
       hint: "Любой ответ подходит, в том числе «не знаю»." },
@@ -66,7 +67,7 @@
   ];
 
   var form = document.getElementById("form");
-  var blocksEl = document.getElementById("blocks");
+  var toplineEl = document.getElementById("topline");
   var counterEl = document.getElementById("counter");
   var noticeEl = document.getElementById("notice");
   var errorEl = document.getElementById("error");
@@ -193,7 +194,7 @@
     if (isOther) {
       label.appendChild(el("input", {
         type: "text", name: q.id + "_other", class: "other-input", hidden: true,
-        placeholder: q.other, maxlength: String(MAX_TEXT), "aria-label": q.label + ": свой вариант"
+        placeholder: "Напишите свой вариант", maxlength: String(MAX_TEXT), "aria-label": q.label + ": свой вариант"
       }));
     }
     return label;
@@ -243,12 +244,11 @@
       body.appendChild(opts);
     } else if (q.type === "matrix") {
       var m = el("div", { class: "matrix", role: "group", "aria-label": q.label });
-      var head = el("div", { class: "matrix-head", "aria-hidden": "true" }, [el("span")]);
-      q.cols.forEach(function (c) { head.appendChild(el("span", { text: c })); });
-      m.appendChild(head);
       q.rows.forEach(function (r) {
         var row = el("div", { class: "matrix-row", role: "radiogroup", "aria-label": r.label });
-        row.appendChild(el("span", { class: "row-label", text: r.label }));
+        var lab = el("span", { class: "row-label", text: r.label });
+        if (r.desc) lab.appendChild(el("span", { class: "row-desc", text: r.desc }));
+        row.appendChild(lab);
         var cells = el("div", { class: "cells" });
         q.cols.forEach(function (c) {
           var input = el("input", { type: "radio", name: q.id + "." + r.id, value: c, "aria-label": r.label + ": " + c });
@@ -266,25 +266,15 @@
   }
 
   function build() {
-    var submitRow = form.querySelector(".submit-row");
+    var submitRow = form.querySelector(".submit-card");
     var qIndex = 0;
-    BLOCKS.forEach(function (b, bi) {
+    BLOCKS.forEach(function (b) {
       var sec = el("section", { class: "block", id: "block-" + b.id, "aria-labelledby": "bt-" + b.id });
-      sec.appendChild(el("div", { class: "block-head" }, [
-        el("span", { class: "block-num", text: "Раздел " + (bi + 1) }),
-        el("h2", { class: "block-title", id: "bt-" + b.id, text: b.title })
-      ]));
-      sec.appendChild(el("p", { class: "block-note", text: b.note }));
-      var list = QUESTIONS.filter(function (q) { return q.block === b.id; });
-      list.forEach(function (q) { sec.appendChild(buildQuestion(q, qIndex++)); });
+      sec.appendChild(el("h2", { class: "block-title", id: "bt-" + b.id, text: b.title }));
+      QUESTIONS.filter(function (q) { return q.block === b.id; }).forEach(function (q) {
+        sec.appendChild(buildQuestion(q, qIndex++));
+      });
       form.insertBefore(sec, submitRow);
-
-      var seg = el("span", { class: "seg", "aria-hidden": "true" }, [el("i")]);
-      var li = el("li", { "data-block": b.id }, [
-        seg,
-        el("a", { href: "#block-" + b.id, text: b.title })
-      ]);
-      blocksEl.appendChild(li);
     });
 
     if (!CONFIG.endpoint) {
@@ -376,27 +366,11 @@
   function updateProgress() {
     answers = readAnswers();
     var answered = 0;
-    var blockDone = {};
-    var blockTotal = {};
     QUESTIONS.forEach(function (q) {
-      blockTotal[q.block] = (blockTotal[q.block] || 0) + 1;
-      if (isAnswered(q, answers[q.id])) {
-        answered++;
-        blockDone[q.block] = (blockDone[q.block] || 0) + 1;
-      }
+      if (isAnswered(q, answers[q.id])) answered++;
     });
     counterEl.textContent = "Отвечено " + answered + " из " + total;
-
-    var currentSet = false;
-    Array.prototype.forEach.call(blocksEl.children, function (li) {
-      var b = li.getAttribute("data-block");
-      var done = (blockDone[b] || 0) === blockTotal[b];
-      li.classList.toggle("done", done);
-      var isCurrent = !done && !currentSet;
-      if (isCurrent) currentSet = true;
-      li.classList.toggle("current", isCurrent);
-      li.querySelector(".seg i").style.width = Math.round(100 * (blockDone[b] || 0) / blockTotal[b]) + "%";
-    });
+    if (toplineEl) toplineEl.style.width = Math.round(100 * answered / total) + "%";
 
     storage("set", DRAFT_KEY, JSON.stringify(answers));
   }
