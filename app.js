@@ -4,6 +4,8 @@
   var CONFIG = window.SURVEY_CONFIG || {};
   var DRAFT_KEY = "survey-draft-v1";
   var SENT_KEY = "survey-sent-v1";
+  var ID_KEY = "survey-id-v1";
+  var SEND_TIMEOUT_MS = 20000;
 
   var BLOCKS = [
     { id: "A", title: "Кто вы", note: "Три вопроса, чтобы собрать группы по направлениям." },
@@ -43,7 +45,7 @@
       ] },
 
     { id: "tasks", block: "C", type: "textarea", label: "Три рабочие задачи, которые хотели бы отдать ИИ", required: true, column: "Три задачи",
-      hint: "По одной на строку. Чем конкретнее, тем точнее практика: не «письма», а «ответы на отзывы гостей на Яндекс Картах».",
+      hint: "По одной на строку, хотя бы одну. Чем конкретнее, тем точнее практика: не «письма», а «ответы на отзывы гостей на Яндекс Картах».",
       placeholder: "1. \n2. \n3. " },
     { id: "agentDef", block: "C", type: "textarea", short: true, label: "Что для вас «ИИ-агент», одним предложением", column: "Что такое агент",
       hint: "Любой ответ подходит, в том числе «не знаю»." },
@@ -69,16 +71,19 @@
   var errorEl = document.getElementById("error");
   var successEl = document.getElementById("success");
   var submitBtn = document.getElementById("submit");
+  var submitHint = form.querySelector(".submit-hint");
 
   var answers = {};
   var total = QUESTIONS.length;
+  var sending = false;
+
+  // ---------- утилиты ----------
 
   function el(tag, attrs, children) {
     var node = document.createElement(tag);
     if (attrs) {
       Object.keys(attrs).forEach(function (k) {
         if (k === "text") node.textContent = attrs[k];
-        else if (k === "html") node.innerHTML = attrs[k];
         else if (attrs[k] === true) node.setAttribute(k, "");
         else if (attrs[k] !== false && attrs[k] != null) node.setAttribute(k, attrs[k]);
       });
@@ -87,40 +92,114 @@
     return node;
   }
 
+  var memoryStore = {};
+  var storageOk = (function () {
+    try {
+      var k = "survey-probe";
+      window.localStorage.setItem(k, "1");
+      window.localStorage.removeItem(k);
+      return true;
+    } catch (e) { return false; }
+  })();
+
   function storage(action, key, value) {
+    if (!storageOk) {
+      if (action === "get") return memoryStore[key] == null ? null : memoryStore[key];
+      if (action === "set") memoryStore[key] = value;
+      if (action === "remove") delete memoryStore[key];
+      return null;
+    }
     try {
       if (action === "get") return window.localStorage.getItem(key);
       if (action === "set") window.localStorage.setItem(key, value);
       if (action === "remove") window.localStorage.removeItem(key);
-    } catch (e) { /* приватный режим или запрет хранения */ }
+    } catch (e) {
+      storageOk = false;
+      updateStorageHint();
+    }
     return null;
+  }
+
+  function updateStorageHint() {
+    if (!submitHint) return;
+    submitHint.textContent = storageOk
+      ? "Черновик сохраняется на этом устройстве, пока вы не отправите ответы."
+      : "Черновик на этом устройстве не сохраняется: заполните и отправьте за один раз.";
+  }
+
+  function uuid() {
+    if (window.crypto && window.crypto.randomUUID) return window.crypto.randomUUID();
+    var bytes = new Array(16);
+    if (window.crypto && window.crypto.getRandomValues) {
+      var buf = new Uint8Array(16);
+      window.crypto.getRandomValues(buf);
+      for (var i = 0; i < 16; i++) bytes[i] = buf[i];
+    } else {
+      for (var j = 0; j < 16; j++) bytes[j] = Math.floor(Math.random() * 256);
+    }
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    var hex = bytes.map(function (b) { return (b + 256).toString(16).slice(1); }).join("");
+    return hex.slice(0, 8) + "-" + hex.slice(8, 12) + "-" + hex.slice(12, 16) + "-" + hex.slice(16, 20) + "-" + hex.slice(20);
+  }
+
+  function submissionId() {
+    var id = storage("get", ID_KEY);
+    if (!id || !/^[0-9a-f-]{36}$/.test(id)) {
+      id = uuid();
+      storage("set", ID_KEY, id);
+    }
+    return id;
+  }
+
+  function cssEscape(s) {
+    return String(s).replace(/["\\]/g, "\\$&");
+  }
+
+  function findQuestion(id) {
+    return QUESTIONS.filter(function (x) { return x.id === id; })[0];
+  }
+
+  function inputsOf(q) {
+    return form.querySelectorAll('#q-' + q.id + ' input, #q-' + q.id + ' textarea');
   }
 
   // ---------- построение формы ----------
 
-  function buildOption(q, value, kind, rowId) {
-    var name = rowId ? q.id + "." + rowId : q.id;
-    var input = el("input", { type: kind, name: name, value: value });
+  function buildOption(q, value, kind) {
+    var input = el("input", { type: kind, name: q.id, value: value });
     return el("label", { class: "opt" }, [input, el("span", { text: value })]);
   }
 
   function buildQuestion(q, index) {
     var wrap = el("fieldset", { class: "q" + (q.required ? " q-required" : ""), id: "q-" + q.id, "data-id": q.id });
-    var legendChildren = [el("span", { class: "q-num", text: String(index + 1) }), el("span", { text: q.label })];
-    wrap.appendChild(el("legend", { class: "q-label" }, legendChildren));
-    if (q.hint) wrap.appendChild(el("p", { class: "q-hint", text: q.hint }));
+    var legend = el("legend", { class: "q-label" }, [
+      el("span", { class: "q-num", text: String(index + 1) }),
+      el("span", { text: q.label })
+    ]);
+    if (q.required) legend.appendChild(el("span", { class: "visually-hidden", text: ", обязательный вопрос" }));
+    wrap.appendChild(legend);
+    if (q.hint) wrap.appendChild(el("p", { class: "q-hint", id: "hint-" + q.id, text: q.hint }));
 
     var body = el("div", { class: "q-body" });
+    var describedBy = q.hint ? "hint-" + q.id : null;
 
     if (q.type === "text") {
-      body.appendChild(el("input", { type: "text", name: q.id, placeholder: q.placeholder || "", autocomplete: q.id === "name" ? "name" : "off", "aria-label": q.label }));
+      body.appendChild(el("input", {
+        type: "text", name: q.id, placeholder: q.placeholder || "",
+        autocomplete: q.id === "name" ? "name" : "off", "aria-label": q.label,
+        "aria-required": q.required ? "true" : null, "aria-describedby": describedBy
+      }));
     } else if (q.type === "textarea") {
-      var ta = el("textarea", { name: q.id, placeholder: q.placeholder || "", rows: q.short ? 2 : 4, "aria-label": q.label });
+      var ta = el("textarea", {
+        name: q.id, placeholder: q.placeholder || "", rows: q.short ? 2 : 4, "aria-label": q.label,
+        "aria-required": q.required ? "true" : null, "aria-describedby": describedBy
+      });
       if (q.short) ta.style.minHeight = "64px";
       body.appendChild(ta);
     } else if (q.type === "single" || q.type === "multi") {
       var kind = q.type === "single" ? "radio" : "checkbox";
-      var opts = el("div", { class: "opts" });
+      var opts = el("div", { class: "opts", role: q.type === "single" ? "radiogroup" : "group", "aria-label": q.label, "aria-required": q.required ? "true" : null, "aria-describedby": describedBy });
       q.options.forEach(function (o) { opts.appendChild(buildOption(q, o, kind)); });
       if (q.exclusive) {
         var ex = buildOption(q, q.exclusive, kind);
@@ -159,15 +238,13 @@
       var sec = el("section", { class: "block", id: "block-" + b.id, "aria-labelledby": "bt-" + b.id });
       sec.appendChild(el("h2", { class: "block-title", id: "bt-" + b.id, text: b.title }));
       sec.appendChild(el("p", { class: "block-note", text: b.note }));
-      QUESTIONS.filter(function (q) { return q.block === b.id; }).forEach(function (q) {
-        sec.appendChild(buildQuestion(q, qIndex++));
-      });
+      var list = QUESTIONS.filter(function (q) { return q.block === b.id; });
+      list.forEach(function (q) { sec.appendChild(buildQuestion(q, qIndex++)); });
       form.insertBefore(sec, submitRow);
 
-      var count = QUESTIONS.filter(function (q) { return q.block === b.id; }).length;
       var li = el("li", { "data-block": b.id }, [
         el("a", { href: "#block-" + b.id, text: b.title }),
-        el("small", { text: count + (count === 3 ? " вопроса" : " вопросов"), "data-count": count })
+        el("small", { text: "0 из " + list.length })
       ]);
       blocksEl.appendChild(li);
     });
@@ -176,9 +253,10 @@
       noticeEl.textContent = "Приём ответов ещё не подключён. Заполнить можно уже сейчас: после отправки предложим скопировать ответы и переслать " + (CONFIG.contact || "организатору") + ".";
       noticeEl.hidden = false;
     }
+    updateStorageHint();
   }
 
-  // ---------- чтение и сохранение ----------
+  // ---------- чтение, черновик, прогресс ----------
 
   function readAnswers() {
     var result = {};
@@ -203,37 +281,41 @@
   }
 
   function isAnswered(q, v) {
-    if (q.type === "multi") return v.length > 0;
-    if (q.type === "matrix") return Object.keys(v).some(function (k) { return v[k]; });
+    if (v == null) return false;
+    if (q.type === "multi") return Array.isArray(v) && v.length > 0;
+    if (q.type === "matrix") return typeof v === "object" && Object.keys(v).some(function (k) { return v[k]; });
     return !!v;
   }
 
+  function setChecked(name, value) {
+    var c = form.querySelector('input[name="' + name + '"][value="' + cssEscape(value) + '"]');
+    if (c) c.checked = true;
+  }
+
   function applyDraft(draft) {
+    if (!draft || typeof draft !== "object") return;
     QUESTIONS.forEach(function (q) {
       var v = draft[q.id];
       if (v == null) return;
-      if (q.type === "text" || q.type === "textarea") {
-        form.elements[q.id].value = v;
-      } else if (q.type === "single") {
-        var r = form.querySelector('input[name="' + q.id + '"][value="' + cssEscape(v) + '"]');
-        if (r) r.checked = true;
-      } else if (q.type === "multi") {
-        (v || []).forEach(function (val) {
-          var c = form.querySelector('input[name="' + q.id + '"][value="' + cssEscape(val) + '"]');
-          if (c) c.checked = true;
-        });
-      } else if (q.type === "matrix") {
-        Object.keys(v).forEach(function (rowId) {
-          if (!v[rowId]) return;
-          var c = form.querySelector('input[name="' + q.id + "." + rowId + '"][value="' + cssEscape(v[rowId]) + '"]');
-          if (c) c.checked = true;
-        });
-      }
+      try {
+        if (q.type === "text" || q.type === "textarea") {
+          if (typeof v === "string") form.elements[q.id].value = v;
+        } else if (q.type === "single") {
+          if (typeof v === "string") setChecked(q.id, v);
+        } else if (q.type === "multi") {
+          if (!Array.isArray(v)) return;
+          var list = v.filter(function (x) { return typeof x === "string"; });
+          // Исключающий вариант не сочетается с остальными: он побеждает.
+          if (q.exclusive && list.indexOf(q.exclusive) !== -1) list = [q.exclusive];
+          list.forEach(function (val) { setChecked(q.id, val); });
+        } else if (q.type === "matrix") {
+          if (typeof v !== "object") return;
+          q.rows.forEach(function (row) {
+            if (typeof v[row.id] === "string" && v[row.id]) setChecked(q.id + "." + row.id, v[row.id]);
+          });
+        }
+      } catch (e) { /* одно испорченное поле не должно ломать остальные */ }
     });
-  }
-
-  function cssEscape(s) {
-    return String(s).replace(/["\\]/g, "\\$&");
   }
 
   function updateProgress() {
@@ -258,8 +340,7 @@
       var isCurrent = !done && !currentSet;
       if (isCurrent) currentSet = true;
       li.classList.toggle("current", isCurrent);
-      var small = li.querySelector("small");
-      small.textContent = (blockDone[b] || 0) + " из " + blockTotal[b];
+      li.querySelector("small").textContent = (blockDone[b] || 0) + " из " + blockTotal[b];
     });
 
     storage("set", DRAFT_KEY, JSON.stringify(answers));
@@ -267,28 +348,65 @@
 
   // ---------- проверка ----------
 
+  function taskLines(text) {
+    return String(text || "").split("\n")
+      .map(function (l) { return l.replace(/^\s*\d+[.)]\s*/, "").trim(); })
+      .filter(Boolean);
+  }
+
+  function markInvalid(q, message) {
+    var wrap = document.getElementById("q-" + q.id);
+    var err = document.getElementById("err-" + q.id);
+    var invalid = !!message;
+    wrap.classList.toggle("invalid", invalid);
+    err.textContent = message || "";
+    Array.prototype.forEach.call(inputsOf(q), function (input) {
+      if (invalid) {
+        input.setAttribute("aria-invalid", "true");
+        var ids = ["err-" + q.id];
+        if (q.hint) ids.push("hint-" + q.id);
+        input.setAttribute("aria-describedby", ids.join(" "));
+      } else {
+        input.removeAttribute("aria-invalid");
+        if (q.hint) input.setAttribute("aria-describedby", "hint-" + q.id);
+        else input.removeAttribute("aria-describedby");
+      }
+    });
+    return invalid ? wrap : null;
+  }
+
   function validate() {
     var firstInvalid = null;
     QUESTIONS.forEach(function (q) {
-      var wrap = document.getElementById("q-" + q.id);
-      var err = document.getElementById("err-" + q.id);
-      var ok = !q.required || isAnswered(q, answers[q.id]);
-      if (q.id === "tasks" && ok) {
-        var lines = answers.tasks.split("\n").map(function (l) { return l.replace(/^\s*\d+[.)]\s*/, "").trim(); }).filter(Boolean);
-        if (lines.length < 1) ok = false;
+      var message = "";
+      if (q.required && !isAnswered(q, answers[q.id])) {
+        message = q.type === "multi" ? "Отметьте хотя бы один вариант."
+          : q.type === "single" ? "Выберите один вариант."
+          : q.id === "tasks" ? "Напишите хотя бы одну задачу."
+          : "Заполните это поле.";
+      } else if (q.id === "tasks" && taskLines(answers.tasks).length < 1) {
+        message = "Напишите хотя бы одну задачу.";
       }
-      wrap.classList.toggle("invalid", !ok);
-      err.textContent = ok ? "" : (q.type === "multi" ? "Отметьте хотя бы один вариант." : q.type === "single" ? "Выберите один вариант." : "Заполните это поле.");
-      if (!ok && !firstInvalid) firstInvalid = wrap;
+      var wrap = markInvalid(q, message);
+      if (wrap && !firstInvalid) firstInvalid = wrap;
     });
     return firstInvalid;
+  }
+
+  function clearInvalid(target) {
+    var wrap = target.closest(".q");
+    if (!wrap || !wrap.classList.contains("invalid")) return;
+    var q = findQuestion(wrap.getAttribute("data-id"));
+    if (!q) return;
+    var ok = isAnswered(q, answers[q.id]) && (q.id !== "tasks" || taskLines(answers.tasks).length >= 1);
+    if (ok) markInvalid(q, "");
   }
 
   // ---------- отправка ----------
 
   function flatten() {
-    var columns = [["Отправлено", "submittedAt"]];
-    var values = { submittedAt: new Date().toISOString() };
+    var columns = [["Отправлено", "submittedAt"], ["ID отправки", "submissionId"]];
+    var values = { submittedAt: new Date().toISOString(), submissionId: submissionId() };
     QUESTIONS.forEach(function (q) {
       if (q.type === "matrix") {
         q.rows.forEach(function (r) {
@@ -320,16 +438,6 @@
     return lines.join("\n");
   }
 
-  function copyAnswers(button) {
-    var text = asText();
-    var done = function () { button.textContent = "Скопировано"; setTimeout(function () { button.textContent = "Скопировать ответы"; }, 2500); };
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(text).then(done, function () { legacyCopy(text); done(); });
-    } else {
-      legacyCopy(text); done();
-    }
-  }
-
   function legacyCopy(text) {
     var ta = document.createElement("textarea");
     ta.value = text;
@@ -338,8 +446,42 @@
     ta.style.left = "-9999px";
     document.body.appendChild(ta);
     ta.select();
-    try { document.execCommand("copy"); } catch (e) { /* ничего */ }
+    var ok = false;
+    try { ok = document.execCommand("copy") === true; } catch (e) { ok = false; }
     document.body.removeChild(ta);
+    return ok;
+  }
+
+  function showManualCopy(panel, text) {
+    var existing = panel.querySelector(".manual-copy");
+    if (existing) { existing.querySelector("textarea").focus(); return; }
+    var box = el("div", { class: "manual-copy" }, [
+      el("p", { text: "Скопировать автоматически не получилось. Выделите текст ниже и скопируйте вручную." }),
+      el("textarea", { readonly: true, rows: 8, "aria-label": "Ваши ответы текстом" })
+    ]);
+    box.querySelector("textarea").value = text;
+    panel.appendChild(box);
+    var ta = box.querySelector("textarea");
+    ta.focus();
+    ta.select();
+  }
+
+  function copyAnswers(button, panel) {
+    var text = asText();
+    var original = "Скопировать ответы";
+    var done = function () {
+      button.textContent = "Скопировано";
+      setTimeout(function () { button.textContent = original; }, 2500);
+    };
+    var fallback = function () {
+      if (legacyCopy(text)) done();
+      else showManualCopy(panel, text);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, fallback);
+    } else {
+      fallback();
+    }
   }
 
   function showError(title, text, withRetry) {
@@ -349,11 +491,11 @@
     var actions = el("div", { class: "actions" });
     if (withRetry) {
       var retry = el("button", { type: "button", class: "btn secondary", text: "Повторить" });
-      retry.addEventListener("click", function () { errorEl.hidden = true; form.requestSubmit ? form.requestSubmit() : submit(); });
+      retry.addEventListener("click", function () { errorEl.hidden = true; submit(); });
       actions.appendChild(retry);
     }
     var copy = el("button", { type: "button", class: "btn secondary", text: "Скопировать ответы" });
-    copy.addEventListener("click", function () { copyAnswers(copy); });
+    copy.addEventListener("click", function () { copyAnswers(copy, errorEl); });
     actions.appendChild(copy);
     errorEl.appendChild(actions);
     errorEl.hidden = false;
@@ -366,15 +508,27 @@
     successEl.hidden = false;
     successEl.focus();
     storage("remove", DRAFT_KEY);
+    storage("remove", ID_KEY);
     storage("set", SENT_KEY, new Date().toISOString());
   }
 
+  function setSending(on) {
+    sending = on;
+    submitBtn.disabled = on;
+    submitBtn.textContent = on ? "Отправляем…" : "Отправить ответы";
+    Array.prototype.forEach.call(form.querySelectorAll("fieldset.q"), function (f) { f.disabled = on; });
+    form.classList.toggle("sending", on);
+  }
+
   function send(payload) {
+    var controller = typeof AbortController === "function" ? new AbortController() : null;
+    var timer = controller ? setTimeout(function () { controller.abort(); }, SEND_TIMEOUT_MS) : null;
     return fetch(CONFIG.endpoint, {
       method: "POST",
       redirect: "follow",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
+      signal: controller ? controller.signal : undefined
     }).then(function (res) {
       if (!res.ok) throw new Error("Сервер ответил " + res.status);
       return res.text().then(function (t) {
@@ -383,10 +537,21 @@
         if (!data.ok) throw new Error(data.error || "Сервер не подтвердил запись");
         return data;
       });
+    }).catch(function (err) {
+      if (err && err.name === "AbortError") throw new Error("Сервер не ответил за " + (SEND_TIMEOUT_MS / 1000) + " секунд");
+      if (err instanceof TypeError) throw new Error("Нет связи с сервером");
+      throw err;
+    }).then(function (data) {
+      if (timer) clearTimeout(timer);
+      return data;
+    }, function (err) {
+      if (timer) clearTimeout(timer);
+      throw err;
     });
   }
 
   function submit() {
+    if (sending) return;
     updateProgress();
     errorEl.hidden = true;
     var firstInvalid = validate();
@@ -402,13 +567,13 @@
       return;
     }
 
-    submitBtn.disabled = true;
-    submitBtn.textContent = "Отправляем…";
-    send(flatten()).then(function () {
+    setSending(true);
+    var payload = flatten();
+    send(payload).then(function () {
+      setSending(false);
       showSuccess();
     }, function (err) {
-      submitBtn.disabled = false;
-      submitBtn.textContent = "Отправить ответы";
+      setSending(false);
       showError("Не удалось отправить", (err && err.message ? err.message + ". " : "") + "Попробуйте ещё раз или скопируйте ответы и отправьте " + (CONFIG.contact || "организатору") + ".", true);
     });
   }
@@ -437,16 +602,6 @@
       clearInvalid(e.target);
     }
   });
-
-  function clearInvalid(target) {
-    var wrap = target.closest(".q");
-    if (!wrap || !wrap.classList.contains("invalid")) return;
-    var q = QUESTIONS.filter(function (x) { return x.id === wrap.getAttribute("data-id"); })[0];
-    if (q && isAnswered(q, answers[q.id])) {
-      wrap.classList.remove("invalid");
-      document.getElementById("err-" + q.id).textContent = "";
-    }
-  }
   form.addEventListener("submit", function (e) { e.preventDefault(); submit(); });
 
   // ---------- старт ----------
